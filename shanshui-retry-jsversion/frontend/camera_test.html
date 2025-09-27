@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f0f0f0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .video-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+        #video {
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            max-width: 100%;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.warning { background: #fff3cd; color: #856404; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: black; }
+        .info-panel {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Camera Test</h1>
+        
+        <div class="info-panel">
+            <h3>Instructions</h3>
+            <p>This page helps you test if your camera is working properly for gaze tracking.</p>
+            <ol>
+                <li>Click "Start Camera" to request camera permission</li>
+                <li>Allow camera access when prompted by your browser</li>
+                <li>You should see your camera feed below</li>
+                <li>If successful, you can proceed to use gaze tracking</li>
+            </ol>
+        </div>
+        
+        <div class="info-panel">
+            <h3>Camera Status</h3>
+            <div id="camera-status" class="status warning">Not started</div>
+            <div>Device: <span id="camera-device">Unknown</span></div>
+            <div>Resolution: <span id="camera-resolution">Unknown</span></div>
+        </div>
+        
+        <div class="info-panel">
+            <h3>Controls</h3>
+            <button id="start-camera" class="btn-primary">Start Camera</button>
+            <button id="stop-camera" class="btn-warning">Stop Camera</button>
+            <button id="test-gazerecorder" class="btn-success">Test GazeRecorder</button>
+        </div>
+        
+        <div class="video-container">
+            <video id="video" autoplay muted playsinline></video>
+        </div>
+        
+        <div class="info-panel">
+            <h3>Debug Log</h3>
+            <div id="debug-log" style="height: 200px; overflow-y: auto; background: #000; color: #0f0; padding: 10px; font-family: monospace; font-size: 12px;"></div>
+        </div>
+    </div>
+
+    <script src="https://app.gazerecorder.com/GazeRecorderAPI.js"></script>
+    <script>
+        class CameraTest {
+            constructor() {
+                this.video = document.getElementById('video');
+                this.stream = null;
+                this.setupEventListeners();
+            }
+            
+            setupEventListeners() {
+                document.getElementById('start-camera').addEventListener('click', () => {
+                    this.startCamera();
+                });
+                
+                document.getElementById('stop-camera').addEventListener('click', () => {
+                    this.stopCamera();
+                });
+                
+                document.getElementById('test-gazerecorder').addEventListener('click', () => {
+                    this.testGazeRecorder();
+                });
+            }
+            
+            async startCamera() {
+                try {
+                    this.log('Requesting camera permission...');
+                    this.updateStatus('Requesting permission...', 'warning');
+                    
+                    // Check available devices
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                    
+                    this.log(`Found ${videoDevices.length} video device(s):`);
+                    videoDevices.forEach((device, index) => {
+                        this.log(`  ${index + 1}. ${device.label || 'Unknown camera'}`);
+                    });
+                    
+                    if (videoDevices.length === 0) {
+                        throw new Error('No camera found on your device');
+                    }
+                    
+                    // Request camera access
+                    this.stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            width: { ideal: 1280, min: 640 },
+                            height: { ideal: 720, min: 480 },
+                            facingMode: 'user',
+                            frameRate: { ideal: 30 }
+                        },
+                        audio: false
+                    });
+                    
+                    // Display video stream
+                    this.video.srcObject = this.stream;
+                    
+                    // Update status
+                    this.updateStatus('Camera active', 'success');
+                    
+                    // Get video track info
+                    const videoTrack = this.stream.getVideoTracks()[0];
+                    if (videoTrack) {
+                        const settings = videoTrack.getSettings();
+                        document.getElementById('camera-device').textContent = videoTrack.label || 'Unknown';
+                        document.getElementById('camera-resolution').textContent = 
+                            `${settings.width}x${settings.height}`;
+                        
+                        this.log(`Camera active: ${videoTrack.label}`);
+                        this.log(`Resolution: ${settings.width}x${settings.height}`);
+                        this.log(`Frame rate: ${settings.frameRate || 'unknown'} fps`);
+                    }
+                    
+                } catch (error) {
+                    this.log('Camera error: ' + error.message);
+                    this.updateStatus('Camera error: ' + error.message, 'error');
+                }
+            }
+            
+            stopCamera() {
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => {
+                        track.stop();
+                        this.log(`Stopped track: ${track.label}`);
+                    });
+                    this.stream = null;
+                    this.video.srcObject = null;
+                    this.updateStatus('Camera stopped', 'warning');
+                    document.getElementById('camera-device').textContent = 'Unknown';
+                    document.getElementById('camera-resolution').textContent = 'Unknown';
+                }
+            }
+            
+            async testGazeRecorder() {
+                try {
+                    this.log('Testing GazeRecorder API...');
+                    
+                    // Load GazeRecorderAPI script
+                    if (!window.GazeRecorderAPI) {
+                        await this.loadGazeRecorderScript();
+                    }
+                    
+                    if (window.GazeRecorderAPI) {
+                        this.log('GazeRecorderAPI loaded successfully');
+                        
+                        // Try to start recording
+                        window.GazeRecorderAPI.Rec();
+                        this.log('GazeRecorderAPI.Rec() called');
+                        
+                        // Check for data after a moment
+                        setTimeout(() => {
+                            try {
+                                const data = window.GazeRecorderAPI.GetRecData();
+                                this.log('GazeRecorder data: ' + JSON.stringify(data));
+                                
+                                if (data && data.length > 0) {
+                                    this.log('GazeRecorder is working!');
+                                } else {
+                                    this.log('GazeRecorder returned empty data');
+                                }
+                                
+                                // Stop recording
+                                window.GazeRecorderAPI.StopRec();
+                                this.log('GazeRecorder stopped');
+                                
+                            } catch (error) {
+                                this.log('GazeRecorder error: ' + error.message);
+                            }
+                        }, 2000);
+                        
+                    } else {
+                        this.log('Failed to load GazeRecorderAPI');
+                    }
+                    
+                } catch (error) {
+                    this.log('GazeRecorder test error: ' + error.message);
+                }
+            }
+            
+            async loadGazeRecorderScript() {
+                return new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = 'https://app.gazerecorder.com/GazeRecorderAPI.js';
+                    script.async = true;
+                    
+                    script.onload = () => {
+                        this.log('GazeRecorderAPI script loaded');
+                        resolve();
+                    };
+                    
+                    script.onerror = () => {
+                        this.log('Failed to load GazeRecorderAPI script');
+                        reject(new Error('Script load failed'));
+                    };
+                    
+                    document.head.appendChild(script);
+                });
+            }
+            
+            updateStatus(message, type) {
+                const statusElement = document.getElementById('camera-status');
+                statusElement.textContent = message;
+                statusElement.className = 'status ' + type;
+            }
+            
+            log(message) {
+                const logElement = document.getElementById('debug-log');
+                const timestamp = new Date().toLocaleTimeString();
+                logElement.innerHTML += `[${timestamp}] ${message}\n`;
+                logElement.scrollTop = logElement.scrollHeight;
+                console.log(message);
+            }
+        }
+        
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            window.cameraTest = new CameraTest();
+        });
+    </script>
+</body>
+</html>

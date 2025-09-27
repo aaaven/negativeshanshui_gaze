@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gaze Tracking Debug</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f0f0f0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .canvas-container {
+            position: relative;
+            margin: 20px 0;
+            border: 2px solid #ccc;
+        }
+        #debug-canvas {
+            display: block;
+            background: #f8f8f8;
+        }
+        .info-panel {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .status.ready { background: #d4edda; color: #155724; }
+        .status.recording { background: #cce5ff; color: #004085; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: black; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Gaze Tracking Debug</h1>
+        
+        <div class="info-panel">
+            <h3>Status</h3>
+            <div id="gaze-status" class="status error">Not Ready</div>
+            <div>Position: <span id="gaze-position">(0, 0)</span></div>
+            <div>Speed: <span id="gaze-speed">0</span> px/s</div>
+            <div>Mode: <span id="tracking-mode">Mouse</span></div>
+        </div>
+        
+        <div class="info-panel">
+            <h3>Controls</h3>
+            <button id="start-gaze" class="btn-success">Start Gaze Tracking</button>
+            <button id="stop-gaze" class="btn-warning">Stop Gaze Tracking</button>
+            <button id="test-mouse" class="btn-primary">Test Mouse</button>
+            <button id="clear-log" class="btn-warning">Clear Log</button>
+        </div>
+        
+                 <div class="canvas-container">
+             <canvas id="debug-canvas" width="1047" height="1544" style="max-width: 100%; height: auto;"></canvas>
+         </div>
+        
+        <div class="info-panel">
+            <h3>Debug Log</h3>
+            <div id="debug-log" style="height: 200px; overflow-y: auto; background: #000; color: #0f0; padding: 10px; font-family: monospace; font-size: 12px;"></div>
+        </div>
+    </div>
+
+    <script src="https://app.gazerecorder.com/GazeRecorderAPI.js"></script>
+    <script src="config.js"></script>
+    <script src="gaze_tracking.js"></script>
+    <script>
+        class GazeDebug {
+            constructor() {
+                this.canvas = document.getElementById('debug-canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.gazeTracker = null;
+                this.isTracking = false;
+                this.mousePosition = { x: 0, y: 0 };
+                
+                this.setupCanvas();
+                this.setupEventListeners();
+                this.initializeGazeTracking();
+            }
+            
+            setupCanvas() {
+                // Draw grid
+                this.ctx.strokeStyle = '#ddd';
+                this.ctx.lineWidth = 1;
+                
+                for (let x = 0; x <= this.canvas.width; x += 50) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, 0);
+                    this.ctx.lineTo(x, this.canvas.height);
+                    this.ctx.stroke();
+                }
+                
+                for (let y = 0; y <= this.canvas.height; y += 50) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, y);
+                    this.ctx.lineTo(this.canvas.width, y);
+                    this.ctx.stroke();
+                }
+                
+                // Draw center cross
+                this.ctx.strokeStyle = '#999';
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.canvas.width/2, 0);
+                this.ctx.lineTo(this.canvas.width/2, this.canvas.height);
+                this.ctx.moveTo(0, this.canvas.height/2);
+                this.ctx.lineTo(this.canvas.width, this.canvas.height/2);
+                this.ctx.stroke();
+            }
+            
+            setupEventListeners() {
+                document.getElementById('start-gaze').addEventListener('click', () => {
+                    this.startGazeTracking();
+                });
+                
+                document.getElementById('stop-gaze').addEventListener('click', () => {
+                    this.stopGazeTracking();
+                });
+                
+                document.getElementById('test-mouse').addEventListener('click', () => {
+                    this.testMouseTracking();
+                });
+                
+                document.getElementById('clear-log').addEventListener('click', () => {
+                    this.clearLog();
+                });
+                
+                // Mouse tracking
+                this.canvas.addEventListener('mousemove', (e) => {
+                    if (!this.isTracking) {
+                        const rect = this.canvas.getBoundingClientRect();
+                        this.mousePosition = {
+                            x: e.clientX - rect.left,
+                            y: e.clientY - rect.top
+                        };
+                        this.updateDisplay();
+                        this.drawCursor();
+                    }
+                });
+                
+                // Gaze data events
+                window.addEventListener('gazeData', (event) => {
+                    this.handleGazeData(event.detail);
+                });
+            }
+            
+            initializeGazeTracking() {
+                try {
+                    if (typeof GazeTracker !== 'undefined') {
+                        this.gazeTracker = new GazeTracker();
+                        this.log('GazeTracker initialized');
+                        this.updateStatus('Ready');
+                    } else {
+                        this.log('GazeTracker not available');
+                        this.updateStatus('Script not found');
+                    }
+                } catch (error) {
+                    this.log('Failed to initialize gaze tracking: ' + error.message);
+                    this.updateStatus('Failed to initialize');
+                }
+            }
+            
+            startGazeTracking() {
+                if (this.gazeTracker) {
+                    this.gazeTracker.toggleGazeTracking(true);
+                    this.isTracking = true;
+                    this.updateStatus('Recording');
+                    this.log('Gaze tracking started');
+                } else {
+                    this.log('GazeTracker not available');
+                }
+            }
+            
+            stopGazeTracking() {
+                if (this.gazeTracker) {
+                    this.gazeTracker.toggleGazeTracking(false);
+                    this.isTracking = false;
+                    this.updateStatus('Ready');
+                    this.log('Gaze tracking stopped');
+                }
+            }
+            
+                         handleGazeData(gazeData) {
+                 this.log('Gaze data: ' + JSON.stringify(gazeData));
+                 
+                 // Use the gaze data directly (already in canvas coordinates)
+                 this.mousePosition = {
+                     x: gazeData.x,
+                     y: gazeData.y
+                 };
+                 
+                 this.updateDisplay();
+                 this.drawCursor();
+             }
+            
+                         testMouseTracking() {
+                 this.log('Testing mouse tracking...');
+                 this.isTracking = false;
+                 this.updateStatus('Mouse Mode');
+                 
+                 // Simulate mouse movement within canvas bounds
+                 const interval = setInterval(() => {
+                     if (!this.isTracking) {
+                         this.mousePosition = {
+                             x: Math.random() * this.canvas.width,
+                             y: Math.random() * this.canvas.height
+                         };
+                         this.updateDisplay();
+                         this.drawCursor();
+                         this.log(`Test position: (${Math.round(this.mousePosition.x)}, ${Math.round(this.mousePosition.y)})`);
+                     } else {
+                         clearInterval(interval);
+                     }
+                 }, 1000);
+                 
+                 setTimeout(() => {
+                     clearInterval(interval);
+                     this.log('Mouse test completed');
+                 }, 5000);
+             }
+            
+            updateDisplay() {
+                document.getElementById('gaze-position').textContent = 
+                    `(${Math.round(this.mousePosition.x)}, ${Math.round(this.mousePosition.y)})`;
+                
+                document.getElementById('tracking-mode').textContent = 
+                    this.isTracking ? 'Gaze' : 'Mouse';
+            }
+            
+            updateStatus(status) {
+                const statusElement = document.getElementById('gaze-status');
+                statusElement.textContent = status;
+                statusElement.className = 'status';
+                
+                if (status.includes('Ready')) {
+                    statusElement.classList.add('ready');
+                } else if (status.includes('Recording')) {
+                    statusElement.classList.add('recording');
+                } else {
+                    statusElement.classList.add('error');
+                }
+            }
+            
+            drawCursor() {
+                // Clear canvas
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.setupCanvas();
+                
+                // Draw cursor
+                this.ctx.fillStyle = this.isTracking ? '#ff0000' : '#0000ff';
+                this.ctx.beginPath();
+                this.ctx.arc(this.mousePosition.x, this.mousePosition.y, 5, 0, 2 * Math.PI);
+                this.ctx.fill();
+                
+                // Draw cursor info
+                this.ctx.fillStyle = '#000';
+                this.ctx.font = '12px Arial';
+                this.ctx.fillText(
+                    `${Math.round(this.mousePosition.x)}, ${Math.round(this.mousePosition.y)}`,
+                    this.mousePosition.x + 10,
+                    this.mousePosition.y - 10
+                );
+            }
+            
+            log(message) {
+                const logElement = document.getElementById('debug-log');
+                const timestamp = new Date().toLocaleTimeString();
+                logElement.innerHTML += `[${timestamp}] ${message}\n`;
+                logElement.scrollTop = logElement.scrollHeight;
+                console.log(message);
+            }
+            
+            clearLog() {
+                document.getElementById('debug-log').innerHTML = '';
+            }
+        }
+        
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            window.gazeDebug = new GazeDebug();
+        });
+    </script>
+</body>
+</html>
