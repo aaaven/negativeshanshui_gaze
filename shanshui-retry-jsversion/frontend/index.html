@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Landscape Generator - Gaze & Mouse Tracking</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <h2>Control Panel</h2>
+            
+            <!-- Connection Status -->
+            <div class="status-section">
+                <h3>Connection Status</h3>
+                <div id="connection-status" class="status-indicator disconnected">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Disconnected</span>
+                </div>
+                <div class="connection-instructions">
+                    <p>1. Select a prompt below</p>
+                    <p>2. Click "Connect & Start" to begin</p>
+                    <p>3. The landscape will open in fullscreen</p>
+                </div>
+                <button id="connect-btn" class="btn primary">Connect & Start</button>
+                <button id="disconnect-btn" class="btn secondary" disabled>Disconnect</button>
+            </div>
+
+            <!-- Prompt Selection -->
+            <div class="prompt-section">
+                <h3>Environment Prompts</h3>
+                <select id="prompt-selector" class="prompt-selector">
+                    <option value="0">Abandoned Chernobyl Amusement Park</option>
+                    <option value="1">Exxon Valdez Oil Spill</option>
+                    <option value="2">Southeast Asian Forest Fire Smoke</option>
+                    <option value="3">2003 European Heatwave</option>
+                    <option value="4">Fukushima Nuclear Plant Ruins</option>
+                    <option value="5">California Forest Fire</option>
+                    <option value="6">Amazon Rainforest Contrast</option>
+                    <option value="7">Polar Bear on Melting Ice</option>
+                    <option value="8">Australian Bushfire</option>
+                    <option value="9">Great Barrier Reef Bleached Coral</option>
+                    <option value="10">Sea Turtle Through Plastic Debris</option>
+                    <option value="11">Brazilian Amazon Fire</option>
+                    <option value="12">Australian Bushfire Aerial View</option>
+                    <option value="13">California Scorched Landscape</option>
+                    <option value="14">East African Locust Plague</option>
+                </select>
+                <div id="current-prompt" class="current-prompt"></div>
+            </div>
+
+            <!-- Tracking Settings -->
+            <div class="tracking-section">
+                <h3>Tracking Settings</h3>
+                <div class="tracking-controls">
+                    <label>
+                        <input type="checkbox" id="tracking-toggle" checked>
+                        Enable Mouse Tracking
+                    </label>
+                    <label>
+                        <input type="checkbox" id="gaze-tracking-toggle">
+                        Enable Gaze Tracking
+                    </label>
+                </div>
+                <div class="tracking-info">
+                    <div>Position: <span id="mouse-position">(0, 0)</span></div>
+                    <div>Speed: <span id="mouse-speed">0</span> px/s</div>
+                    <div>Mode: <span id="tracking-mode">Mouse</span></div>
+                    <div>Gaze Status: <span id="gaze-status">Not Ready</span></div>
+                </div>
+            </div>
+
+            <!-- User Information -->
+            <div class="user-section">
+                <h3>User Information</h3>
+                <div id="user-info" class="user-info">
+                    <div class="user-id">Not connected</div>
+                    <div class="connection-status">Status: Disconnected</div>
+                </div>
+            </div>
+
+            <!-- System Control -->
+            <div class="system-section">
+                <h3>System Control</h3>
+                <button id="reset-btn" class="btn warning">Reset System</button>
+                <button id="fullscreen-btn" class="btn secondary">Fullscreen Display</button>
+            </div>
+        </div>
+
+        <!-- Image Display Area -->
+        <div class="display-area">
+            <div class="canvas-container">
+                <canvas id="main-canvas" width="1047" height="1544"></canvas>
+                <div class="canvas-overlay">
+                    <div class="loading-indicator" id="loading-indicator" style="display: none;">
+                        <div class="spinner"></div>
+                        <span>Generating image...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Images Display -->
+        <div class="history-area">
+            <h3>History Images</h3>
+            <div id="history-container" class="history-container">
+                <!-- History images will be displayed here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Load required scripts -->
+    <script src="https://app.gazerecorder.com/GazeRecorderAPI.js"></script>
+    <script src="config.js"></script>
+    <script src="gaze_tracking.js"></script>
+    <script src="multi_user_app.js"></script>
+</body>
+</html> 

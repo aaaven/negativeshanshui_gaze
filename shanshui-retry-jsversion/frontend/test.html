@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gaze Tracking Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.warning { background: #fff3cd; color: #856404; }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+        
+        .button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .button:hover { background: #0056b3; }
+        .button:disabled { background: #6c757d; cursor: not-allowed; }
+        
+        .button.success { background: #28a745; }
+        .button.success:hover { background: #1e7e34; }
+        
+        .button.danger { background: #dc3545; }
+        .button.danger:hover { background: #c82333; }
+        
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .data-display {
+            background: #e9ecef;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Gaze Tracking Test</h1>
+        
+        <div id="status" class="status info">Initializing...</div>
+        
+        <div>
+            <button id="testGaze" class="button success">Test Gaze Tracking</button>
+            <button id="testMouse" class="button">Test Mouse Tracking</button>
+            <button id="clearLog" class="button">Clear Log</button>
+        </div>
+        
+        <div class="data-display">
+            <strong>Position:</strong> <span id="position">(0, 0)</span><br>
+            <strong>Speed:</strong> <span id="speed">0</span> px/s<br>
+            <strong>Mode:</strong> <span id="mode">None</span><br>
+            <strong>Gaze Status:</strong> <span id="gazeStatus">Not Ready</span>
+        </div>
+        
+        <div id="log" class="log">Log will appear here...</div>
+        
+        <div style="text-align: center; margin-top: 20px;">
+            <a href="index.html" class="button">🚀 Go to Main Application</a>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="https://app.gazerecorder.com/GazeRecorderAPI.js"></script>
+    <script src="gaze_tracking.js"></script>
+    <script>
+        class GazeTest {
+            constructor() {
+                this.gazeTracker = null;
+                this.isTracking = false;
+                this.setupEventListeners();
+                this.log('Test initialized');
+                this.initializeGazeTracking();
+            }
+            
+            setupEventListeners() {
+                document.getElementById('testGaze').addEventListener('click', () => this.testGazeTracking());
+                document.getElementById('testMouse').addEventListener('click', () => this.testMouseTracking());
+                document.getElementById('clearLog').addEventListener('click', () => this.clearLog());
+                
+                // Mouse tracking
+                document.addEventListener('mousemove', (e) => {
+                    if (this.isTracking && !this.useGazeTracking) {
+                        this.updatePosition(e.clientX, e.clientY, 0);
+                    }
+                });
+            }
+            
+            log(message) {
+                const logDiv = document.getElementById('log');
+                const timestamp = new Date().toLocaleTimeString();
+                logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+                logDiv.scrollTop = logDiv.scrollHeight;
+                console.log(message);
+            }
+            
+            clearLog() {
+                document.getElementById('log').innerHTML = 'Log cleared...\n';
+            }
+            
+            updateStatus(message, type = 'info') {
+                const statusDiv = document.getElementById('status');
+                statusDiv.textContent = message;
+                statusDiv.className = `status ${type}`;
+            }
+            
+            updatePosition(x, y, speed) {
+                document.getElementById('position').textContent = `(${Math.round(x)}, ${Math.round(y)})`;
+                document.getElementById('speed').textContent = Math.round(speed);
+            }
+            
+            initializeGazeTracking() {
+                try {
+                    this.log('Initializing gaze tracking...');
+                    
+                    if (typeof GazeTracker !== 'undefined') {
+                        this.gazeTracker = new GazeTracker();
+                        
+                        // Listen for gaze data events
+                        window.addEventListener('gazeData', (event) => {
+                            this.log(`Gaze data: x=${event.detail.x}, y=${event.detail.y}, speed=${event.detail.speed}`);
+                            this.updatePosition(event.detail.x, event.detail.y, event.detail.speed);
+                            document.getElementById('mode').textContent = 'Gaze';
+                        });
+                        
+                        this.log('Gaze tracking initialized successfully');
+                        this.updateStatus('Gaze tracking ready', 'success');
+                        document.getElementById('gazeStatus').textContent = 'Ready';
+                        
+                    } else {
+                        this.log('GazeTracker not available');
+                        this.updateStatus('GazeTracker not available', 'warning');
+                    }
+                    
+                } catch (error) {
+                    this.log(`Error initializing gaze tracking: ${error.message}`);
+                    this.updateStatus('Gaze tracking failed', 'error');
+                }
+            }
+            
+            testGazeTracking() {
+                if (!this.gazeTracker) {
+                    this.log('Gaze tracker not available');
+                    return;
+                }
+                
+                this.log('Testing gaze tracking...');
+                this.useGazeTracking = true;
+                this.isTracking = true;
+                document.getElementById('mode').textContent = 'Gaze';
+                
+                this.gazeTracker.toggleGazeTracking(true);
+                this.log('Gaze tracking started');
+                
+                setTimeout(() => {
+                    this.gazeTracker.toggleGazeTracking(false);
+                    this.log('Gaze tracking stopped');
+                    this.isTracking = false;
+                }, 5000);
+            }
+            
+            testMouseTracking() {
+                this.log('Testing mouse tracking...');
+                this.useGazeTracking = false;
+                this.isTracking = true;
+                document.getElementById('mode').textContent = 'Mouse';
+                
+                setTimeout(() => {
+                    this.log('Mouse tracking stopped');
+                    this.isTracking = false;
+                }, 3000);
+            }
+        }
+        
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            window.gazeTest = new GazeTest();
+        });
+    </script>
+</body>
+</html>
+
+
